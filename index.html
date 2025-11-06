@@ -135,7 +135,7 @@
         ]},
         { id: 'p3', title: 'Phase 3: The Outdoor Fortress', timeline: 'Weeks 4-6 (Buy after transplant)', items: [
             { id: "i13", name: "Small 'Walk-in' Greenhouse", cost: 2300, reason: "Protects 4 outdoor pots from harsh wind/rain. (This 4-shelf model is ideal)", link: "https://growingtechsa.co.za/product/tiered-walk-in-greenhouse-4-shelves/", purchased: false, suggestions: "Budget: You can build a simple hoop house with PVC pipes and greenhouse plastic for under R500. It's less durable but provides the same protection." },
-            { id: "i14", name: "Organic Pesticide (Neem Oil)", cost: 110, reason: "Start a weekly preventative spray routine for outdoor pests.", link: "https://www.greenhouston.co.za/products/bioneem-by-biogrow", purchased: false, suggestions: "Neem oil is the standard. 'Bioneem' by Biogrow is a popular local brand. Always mix with a few drops of dish soap to help it emulsify in water." },
+            { id: "i14", name: "Organic Pesticide (Neem Oil)", cost: 110, reason: "Start a weekly preventative spray routine for outdoor pests.", link: "https://www.greenhouston.co.za/products/bioneem-by-biogrow", purchased: false, suggestions: "Neem oil is the standard. 'Bioneem' by Biogrow is a popular brand. Always mix with a few drops of dish soap to help it emulsify in water." },
             { id: "i15", name: "Stakes & Plant Ties", cost: 125, reason: "Be ready to support plants as they grow taller.", link: "https://happyharvest.co.za/product/bamboo-stakes/", purchased: false, suggestions: "A 'Trellis Net' is a great alternative to stakes for supporting multiple branches, especially if you plan to do any plant training (LST)." }
         ]},
         { id: 'p4', title: 'Phase 4: The "Stealth" Upgrade', timeline: 'Weeks 7-8 (Buy before flower)', items: [
@@ -172,7 +172,7 @@
       const formatDate = (date) => {
         if (!date) return 'No date';
         let d;
-        if (date.toDate) { // It's a Firebase Timestamp
+        if (date && date.toDate) { // It's a Firebase Timestamp
           d = date.toDate();
         } else if (typeof date === 'string' || typeof date === 'number') {
           d = new Date(date);
@@ -195,7 +195,7 @@
       - Item: ${item.name}
       - My Budgeted Cost: ${formatCurrency(item.cost)}
       - My Reason: ${item.reason}
-      What are some good budget or upgrade alternatives I can find in South Africa?`;
+      What are some good budget or upgrade alternatives I can find in SouthAfrica?`;
         
         const apiKey = ""; // Handled by environment
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -236,9 +236,10 @@
           }
 
           const result = await response.json();
-          const candidate = result.candidates?.[0];
+          // *** FIX: Replaced all '?' with '&&' for Babel compatibility ***
+          const candidate = (result.candidates && result.candidates[0]);
 
-          if (candidate && candidate.content?.parts?.[0]?.text) {
+          if (candidate && candidate.content && candidate.content.parts && candidate.content.parts[0] && candidate.content.parts[0].text) {
             return candidate.content.parts[0].text;
           } else {
             return "Sorry, I couldn't get a suggestion for that item. The AI returned an empty response. Please try again.";
@@ -739,7 +740,7 @@
         }, [phases]);
 
         return (
-          <>
+          <React.Fragment>
             <BudgetSummary totalBudget={totalBudget} totalSpent={totalSpent} />
             <div className="space-y-4">
               {phases.map(phase => (
@@ -753,25 +754,30 @@
                 />
               ))}
             </div>
-          </>
+          </React.Fragment>
         );
       };
 
       // --- Plants Page ---
       const PlantsPage = ({ project, projectRef }) => {
+        // *** FIX: Replaced all '??' with '||' for Babel compatibility ***
         const [plants, setPlants] = useState(project.plants || []);
         const [showAddForm, setShowAddForm] = useState(false);
         const [newPlantName, setNewPlantName] = useState('');
         const [newPlantStrain, setNewPlantStrain] = useState('');
 
-        const updateFirebase = async (newPlants) => {
+        const updateFirebase = async (newPlants, newJournal) => {
           try {
-            await updateDoc(projectRef, { plants: newPlants });
+            const updateData = { plants: newPlants };
+            if (newJournal) {
+              updateData.journal = newJournal;
+            }
+            await updateDoc(projectRef, updateData);
           } catch (error) {
             console.error("Error updating plants: ", error);
           }
         };
-
+        
         const handleAddPlant = (e) => {
           e.preventDefault();
           if (!newPlantName.trim()) return;
@@ -790,20 +796,17 @@
         };
 
         const handleDeletePlant = (plantId) => {
-          // TODO: Also delete journal entries
+          if (!window.confirm("Are you sure you want to delete this plant and all its journal entries?")) return;
+          
           const newPlants = plants.filter(p => p.id !== plantId);
           setPlants(newPlants);
-          updateFirebase(newPlants);
-          // We also need to delete the journal entries for this plant
-          updateDoc(projectRef, {
-            [`journal.${plantId}`]: deleteField() // This needs `import { deleteField } from 'firebase/firestore'`
-          }).catch(err => console.error("Error deleting journal entries: ", err));
-          // Note: deleteField is not imported. A safer way is setting to null or {}.
-          // Let's use the safer way:
-          const newJournal = { ...project.journal };
-          delete newJournal[plantId];
-          updateDoc(projectRef, { journal: newJournal });
 
+          // Also delete journal entries for this plant
+          // *** FIX: Replaced all '??' with '||' for Babel compatibility ***
+          const newJournal = { ...(project.journal || {}) };
+          delete newJournal[plantId];
+          
+          updateFirebase(newPlants, newJournal);
         };
 
         return (
@@ -861,6 +864,7 @@
 
       // --- Journal Page ---
       const JournalPage = ({ project, projectRef }) => {
+        // *** FIX: Replaced all '??' with '||' for Babel compatibility ***
         const [plants, setPlants] = useState(project.plants || []);
         const [journal, setJournal] = useState(project.journal || {});
         const [selectedPlantId, setSelectedPlantId] = useState(null);
@@ -1062,7 +1066,8 @@
             querySnapshot.forEach((doc) => {
               userProjects.push({ id: doc.id, ...doc.data() });
             });
-            setProjects(userProjects.sort((a,b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0)));
+            // *** FIX: Added check for createdAt.toDate ***
+            setProjects(userProjects.sort((a,b) => ((b.createdAt && b.createdAt.toDate ? b.createdAt.toDate() : 0) - (a.createdAt && a.createdAt.toDate ? a.createdAt.toDate() : 0))));
             setLoading(false);
           }, (err) => {
             console.error("Error fetching projects: ", err);
@@ -1152,8 +1157,9 @@
                     </p>
                   </div>
                   <div className="bg-gray-700 p-4 rounded-b-xl text-xs text-gray-300 flex justify-between">
-                    <span>{project.plants?.length || 0} Plants</span>
-                    <span>{project.budget?.phases.reduce((acc, p) => acc + p.items.length, 0) || 0} Items</span>
+                    {/* *** FIX: Replaced all '??' with '||' for Babel compatibility *** */}
+                    <span>{(project.plants || []).length} Plants</span>
+                    <span>{(project.budget && project.budget.phases ? project.budget.phases.reduce((acc, p) => acc + (p.items || []).length, 0) : 0)} Items</span>
                   </div>
                 </div>
               ))}
@@ -1272,7 +1278,7 @@
             
           } catch (err) {
             console.error("Error sending friend request: ", err);
-            setError("Failed to send friend request. " + err.message);
+            setError("Failed to send friend request. " + (err.message || 'Unknown error.'));
           }
         };
 
@@ -1299,7 +1305,7 @@
             
           } catch (err) {
             console.error("Error responding to request: ", err);
-            setError("Failed to respond to request. " + err.message);
+            setError("Failed to respond to request. " + (err.message || 'Unknown error.'));
           }
         };
 
@@ -1323,7 +1329,7 @@
               
             } catch (err) {
               console.error("Error removing friend: ", err);
-              setError("Failed to remove friend. " + err.message);
+              setError("Failed to remove friend. " + (err.message || 'Unknown error.'));
             }
           }
         };
@@ -1431,7 +1437,7 @@
             setSelectedFriendId('');
           } catch (err) {
             console.error("Error sharing project: ", err);
-            setError("Failed to share project. " + err.message);
+            setError("Failed to share project. " + (err.message || 'Unknown error.'));
           }
         };
         
@@ -1448,9 +1454,12 @@
             setSuccess("User removed from project.");
           } catch (err) {
             console.error("Error removing member: ", err);
-            setError("Failed to remove user. " + err.message);
+            setError("Failed to remove user. " + (err.message || 'Unknown error.'));
           }
         };
+
+        // *** FIX: Replaced all '??' with '||' for Babel compatibility ***
+        const projectMembers = project ? (project.members || []) : [];
 
         return (
           <Modal show={show} onClose={onClose} title="Share Project">
@@ -1482,15 +1491,16 @@
 
             <h3 className="text-lg font-semibold text-white mt-6 mb-2">Project Members</h3>
             <div className="space-y-2">
-              {project?.members.map(memberId => (
+              {projectMembers.map(memberId => (
                 <div key={memberId} className="bg-gray-700 p-3 rounded-lg flex justify-between items-center">
                   <span className="text-gray-200">
-                    {memberId === user.uid ? `${user.email} (You)` : (friends.find(f => f.uid === memberId)?.email || 'Unknown User')}
+                    {/* *** FIX: Replaced '?' with '||' for Babel compatibility *** */}
+                    {memberId === user.uid ? (user.email + " (You)") : ((friends.find(f => f.uid === memberId) || {}).email || 'Unknown User')}
                   </span>
-                  {memberId === project.ownerId && (
+                  {memberId === (project && project.ownerId) && (
                     <span className="text-xs font-medium text-green-400 bg-green-900 px-2 py-0.5 rounded-full">Owner</span>
                   )}
-                  {memberId !== project.ownerId && user.uid === project.ownerId && (
+                  {memberId !== (project && project.ownerId) && user.uid === (project && project.ownerId) && (
                      <button onClick={() => handleRemoveMember(memberId)} className="p-1 bg-gray-600 hover:bg-gray-500 rounded-full text-red-400">
                        <IconTrash />
                      </button>
@@ -1525,7 +1535,7 @@
               <header className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <div className="flex items-center gap-2">
                    <h1 className="text-2xl font-bold text-green-400">Grow Companion</h1>
-                   <span className="text-xs font-medium text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">v5.0</span>
+                   <span className="text-xs font-medium text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">v5.1</span>
                 </div>
                 
                 <nav className="flex-1 flex justify-center">
@@ -1549,7 +1559,15 @@
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-sm text-gray-300">{user.email}</p>
-                    <p className="text-xs text-gray-400 cursor-pointer" onClick={() => {navigator.clipboard.writeText(user.uid); alert('User ID copied to clipboard!')}}>
+                    <p className="text-xs text-gray-400 cursor-pointer" onClick={() => {
+                      try {
+                        navigator.clipboard.writeText(user.uid);
+                        alert('User ID copied to clipboard!');
+                      } catch(e) {
+                        console.error('Failed to copy user ID: ', e);
+                        alert('Failed to copy. Your User ID is: ' + user.uid);
+                      }
+                    }}>
                       Copy User ID
                     </p>
                   </div>
